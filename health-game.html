@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>7일의 회복 - 건강 되찾기 게임</title>
+<style>
+:root{--bg:#f4f1ea;--card:#fff;--ink:#2b2f2a;--sub:#6b7068;--line:#e2ded3;--green:#3f8f5a;--red:#d1594a;--blue:#4a7fb5;--amber:#d89a2b;--btn:#f0f5ee}
+@media (prefers-color-scheme:dark){:root{--bg:#171a17;--card:#222622;--ink:#ecefe9;--sub:#a0a79c;--line:#343a33;--btn:#2a312a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;line-height:1.6}
+#app{max-width:640px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:14px}
+h1{margin:4px 0 8px;font-size:28px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{font-size:13px;color:var(--sub)}
+.bar{height:10px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;transition:width .5s}
+.stat b{color:var(--ink)}
+.top{display:flex;justify-content:space-between;font-size:14px;color:var(--sub);margin-bottom:10px}
+.emoji{font-size:48px;line-height:1}
+.scene h2{margin:8px 0 6px;font-size:20px}
+.scene p{margin:0;font-size:16px}
+.choice{display:block;width:100%;text-align:left;font:inherit;color:var(--ink);background:var(--btn);border:1px solid var(--line);border-radius:12px;padding:13px 15px;margin-top:10px;cursor:pointer;transition:transform .1s,border-color .1s}
+.choice:hover{border-color:var(--green);transform:translateY(-1px)}
+.primary{background:var(--green);color:#fff;border:0;text-align:center;font-weight:700}
+.delta{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.chip{font-size:13px;padding:2px 10px;border-radius:99px;border:1px solid var(--line)}
+.up{color:var(--green)}.down{color:var(--red)}
+.tip{background:var(--btn);border-left:4px solid var(--amber);padding:10px 12px;border-radius:8px;font-size:14px;margin-top:10px}
+.sub{color:var(--sub);font-size:14px}
+.hero{display:flex;gap:12px;align-items:center}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const $=s=>document.querySelector(s);
+const clamp=v=>Math.max(0,Math.min(100,v));
+const SLOTS=["아침","점심","오후","저녁"];
+const DAYS=7;
+
+// fx: h=건강, e=에너지, m=멘탈
+const POOL={
+"아침":[
+{e:"⏰",t:"알람이 울린다",d:"어젯밤 늦게까지 폰을 봐서 몸이 천근만근이다. 출근까지 40분 남았다.",c:[
+ {l:"물 한 잔 마시고 가볍게 스트레칭한다",fx:{h:4,e:5,m:3},r:"몸이 서서히 깨어난다. 아침 수분 보충은 밤새 줄어든 체내 수분을 채워준다.",tip:"기상 후 물 한 잔과 가벼운 스트레칭은 혈액순환과 집중력에 도움이 됩니다."},
+ {l:"5분만 더... 스누즈를 누른다",fx:{h:-2,e:-3,m:-3},r:"결국 허둥지둥 준비하고 아침도 거른 채 뛰쳐나간다.",tip:"잠이 깬 뒤 다시 자는 선잠은 오히려 피로감을 높일 수 있어요."},
+ {l:"에너지 드링크로 정신을 깨운다",fx:{h:-5,e:4,m:-2},r:"잠깐 깨는 듯하지만 가슴이 두근거린다.",tip:"카페인과 당이 가득한 에너지 음료는 일시적 각성 뒤 피로를 키웁니다."}]},
+{e:"🍳",t:"아침 식사",d:"냉장고를 열었다. 계란, 현미밥, 요거트, 그리고 어제 사둔 도넛이 있다.",c:[
+ {l:"계란 + 현미밥 + 방울토마토",fx:{h:6,e:5,m:2},r:"든든하고 속이 편하다. 오전 내내 허기가 덜하다.",tip:"단백질과 복합탄수화물 아침은 혈당을 천천히 올려 오전 집중력을 지켜줍니다."},
+ {l:"플레인 요거트에 견과류",fx:{h:4,e:3,m:2},r:"가볍지만 영양은 충분하다.",tip:"무가당 요거트와 견과류는 간편하면서 좋은 단백질·지방 공급원이에요."},
+ {l:"도넛과 믹스커피",fx:{h:-5,e:-2,m:1},r:"달콤하지만 한 시간 뒤 급격한 졸음이 몰려온다.",tip:"정제당 위주 아침은 혈당 스파이크 후 급강하를 부릅니다."}]},
+{e:"🚌",t:"출근길",d:"버스 정류장까지 걸어서 15분, 버스를 타면 5분. 날씨는 맑다.",c:[
+ {l:"한 정거장 먼저 내려 걷는다",fx:{h:5,e:-1,m:3},r:"아침 햇볕을 쬐며 걸으니 기분이 상쾌하다.",tip:"하루 30분 걷기는 심혈관 건강과 기분 개선에 효과적입니다."},
+ {l:"그냥 버스를 탄다",fx:{h:0,e:1,m:0},r:"무난한 출근길. 별다른 변화는 없다.",tip:"나쁘지 않지만 움직일 기회는 놓쳤어요."},
+ {l:"택시를 불러 최대한 편하게 간다",fx:{h:-2,e:2,m:-1},r:"편하긴 한데 오늘 움직임이 거의 없다.",tip:"앉아있는 시간이 길수록 대사 건강에 불리합니다."}]},
+{e:"😴",t:"아침의 피로",d:"요즘 계속 피곤해서 회복이 더디다. 주말 아침, 아무 일정이 없다.",c:[
+ {l:"평소 시간에 일어나 햇볕 쬐며 산책",fx:{h:5,e:3,m:4},r:"생체리듬이 정돈되는 기분이다.",tip:"아침 햇볕은 수면 호르몬 리듬을 맞춰 밤잠 질을 높여줍니다."},
+ {l:"점심까지 푹 잔다",fx:{h:-3,e:-2,m:1},r:"개운할 줄 알았는데 오히려 더 멍하다.",tip:"주말 늦잠은 '사회적 시차'를 만들어 월요일 피로를 키워요."}]},
+{e:"🥤",t:"편의점 앞",d:"출근 전 편의점. 갈증이 나고 배도 출출하다.",c:[
+ {l:"생수와 삶은 달걀",fx:{h:4,e:3,m:1},r:"깔끔한 선택! 속이 든든하다.",tip:"삶은 달걀은 값싸고 훌륭한 단백질 간식입니다."},
+ {l:"탄산음료와 삼각김밥",fx:{h:-3,e:1,m:1},r:"순간 배는 부르지만 나트륨과 당이 걱정된다.",tip:"음료 속 당류는 생각보다 많아요. 물이 가장 좋은 음료입니다."},
+ {l:"그냥 굶고 간다",fx:{h:-3,e:-4,m:-2},r:"오전 내내 짜증이 나고 집중이 안 된다.",tip:"아침 결식은 폭식으로 이어지기 쉬워요."}]},
+],
+"점심":[
+{e:"🍱",t:"점심시간",d:"동료들이 점심 메뉴를 고르고 있다. 오늘 선택지는 세 가지.",c:[
+ {l:"생선구이 정식(밥은 반 공기, 나물 반찬)",fx:{h:7,e:4,m:3},r:"담백하고 든든하다. 오후가 편안할 것 같다.",tip:"생선과 채소 반찬은 오메가-3와 식이섬유를 함께 채워줍니다."},
+ {l:"짜장면 + 탕수육",fx:{h:-6,e:-3,m:3},r:"맛있게 먹었지만 곧바로 식곤증이 쏟아진다.",tip:"기름지고 정제 탄수화물이 많은 식사는 졸음과 혈당 변동을 키웁니다."},
+ {l:"샐러드 한 접시만",fx:{h:2,e:-3,m:-1},r:"가볍지만 3시도 안 돼서 배가 고파진다.",tip:"단백질이 빠진 샐러드는 포만감이 오래가지 않아요."}]},
+{e:"🍲",t:"회식 같은 점심",d:"팀장님이 삼겹살집에 가자고 한다. 분위기상 거절하기 애매하다.",c:[
+ {l:"쌈채소를 듬뿍, 기름은 덜어내며 먹는다",fx:{h:3,e:1,m:2},r:"분위기도 챙기고 건강도 챙겼다.",tip:"외식 때도 채소 비율을 늘리면 부담을 줄일 수 있어요."},
+ {l:"분위기 타서 무한 리필",fx:{h:-6,e:-3,m:2},r:"배가 터질 것 같고 오후 업무는 포기 상태.",tip:"과식 후엔 졸음과 더부룩함이 이어집니다."},
+ {l:"정중히 거절하고 혼자 비빔밥",fx:{h:5,e:2,m:-2},r:"몸은 좋지만 어쩐지 어색하다.",tip:"건강도 중요하지만 관계 스트레스도 관리 대상입니다."}]},
+{e:"🥗",t:"도시락의 유혹",d:"어제 만든 도시락이 있지만, 오늘따라 배달앱의 프로모션이 눈에 띈다.",c:[
+ {l:"도시락을 먹는다",fx:{h:6,e:3,m:2},r:"내가 조절한 식사라 마음이 편하다.",tip:"직접 만든 식사는 염분·당·기름을 조절하기 쉬워요."},
+ {l:"치킨 배달을 시킨다",fx:{h:-6,e:0,m:3},r:"행복하지만 죄책감이 따라온다.",tip:"가끔의 즐거움은 괜찮아요. 빈도가 문제입니다."}]},
+{e:"🍜",t:"컵라면 데이",d:"바빠서 점심 시간이 15분뿐이다.",c:[
+ {l:"샌드위치와 우유로 간단히",fx:{h:3,e:2,m:0},r:"빠르고 부담이 덜하다.",tip:"짧은 시간에도 단백질+채소를 챙길 수 있습니다."},
+ {l:"컵라면 국물까지 다 마신다",fx:{h:-6,e:-2,m:1},r:"짠맛에 얼굴이 붓고 갈증이 난다.",tip:"라면 국물 한 그릇엔 하루 나트륨 권장량의 상당 부분이 들어 있어요."},
+ {l:"식사를 건너뛰고 일한다",fx:{h:-4,e:-4,m:-3},r:"저녁에 폭식이 걱정된다.",tip:"끼니 거르기는 대사 리듬을 흐트러뜨립니다."}]},
+{e:"🥢",t:"천천히 먹기",d:"점심 약속이 취소돼 혼자 먹게 됐다. 폰을 볼까, 식사에 집중할까?",c:[
+ {l:"폰을 내려놓고 꼭꼭 씹어 먹는다",fx:{h:4,e:2,m:4},r:"포만감이 적당히 느껴지고 마음도 편하다.",tip:"천천히 먹으면 포만 신호가 전달될 시간을 벌어 과식을 막아줍니다."},
+ {l:"영상 보며 허겁지겁",fx:{h:-2,e:0,m:0},r:"어느새 그릇이 비었지만 먹은 기억이 없다.",tip:"빨리 먹는 습관은 과식·소화불량과 연관됩니다."}]},
+],
+"오후":[
+{e:"🪑",t:"오후 3시, 졸음",d:"모니터 앞에서 눈이 감긴다. 앉은 지 3시간째.",c:[
+ {l:"자리에서 일어나 5분 스트레칭 + 물",fx:{h:4,e:4,m:3},r:"몸이 풀리며 다시 집중력이 돌아온다.",tip:"1시간마다 일어나 움직이면 장시간 앉기의 해로움이 줄어요."},
+ {l:"달달한 라떼를 주문한다",fx:{h:-3,e:2,m:1},r:"잠깐 깨지만 저녁에 잠이 안 올 수도 있다.",tip:"오후 늦은 카페인은 수면의 질을 해칠 수 있어요."},
+ {l:"책상에 엎드려 눈을 붙인다",fx:{h:1,e:3,m:1},r:"15분 선잠으로 약간 개운해졌다.",tip:"20분 이내의 짧은 낮잠은 피로 회복에 도움이 됩니다."}]},
+{e:"😤",t:"스트레스 폭발",d:"상사가 갑자기 야근을 요청했다. 가슴이 답답하다.",c:[
+ {l:"화장실에서 심호흡 3분 후 차분히 대화",fx:{h:3,e:0,m:5},r:"감정이 가라앉고 일정을 조율할 수 있었다.",tip:"복식호흡은 부교감신경을 활성화해 스트레스를 낮춥니다."},
+ {l:"퇴근길에 폭식으로 풀기로 한다",fx:{h:-5,e:-2,m:-2},r:"순간 위안이지만 마음은 그대로다.",tip:"감정적 폭식은 스트레스를 해결하지 못해요."},
+ {l:"참고 아무 말도 하지 않는다",fx:{h:-2,e:-2,m:-5},r:"속으로 삭이니 두통이 온다.",tip:"감정을 쌓아두면 몸 증상으로 나타날 수 있어요."}]},
+{e:"🍪",t:"사무실 간식 테이블",d:"누군가 쿠키와 초콜릿을 잔뜩 가져왔다.",c:[
+ {l:"한 조각만 천천히 음미한다",fx:{h:0,e:1,m:3},r:"만족감은 충분하다.",tip:"완전한 금지보다 양 조절이 오래 갑니다."},
+ {l:"견과류와 과일을 찾아 먹는다",fx:{h:4,e:2,m:1},r:"간식도 건강하게!",tip:"견과류·과일은 포만감과 영양을 함께 챙겨줍니다."},
+ {l:"여러 개 집어 책상에 쌓아둔다",fx:{h:-5,e:-1,m:0},r:"어느새 봉지가 비었다.",tip:"눈앞에 있는 간식은 더 많이 먹게 됩니다."}]},
+{e:"🚶",t:"동료의 제안",d:"동료가 \"같이 산책할래요?\" 하고 묻는다.",c:[
+ {l:"좋아요! 15분 걷고 온다",fx:{h:5,e:2,m:5},r:"대화도 하고 머리도 맑아졌다.",tip:"사회적 교류와 걷기는 정신 건강에 큰 도움이 됩니다."},
+ {l:"바빠서 못 가요",fx:{h:-1,e:-1,m:-2},r:"결국 일은 더디고 기분만 가라앉았다.",tip:"휴식은 생산성의 일부입니다."}]},
+{e:"💧",t:"물 마시기",d:"하루 종일 커피만 마신 것 같다. 목이 마르다.",c:[
+ {l:"텀블러에 물을 채워 틈틈이 마신다",fx:{h:4,e:3,m:1},r:"두통이 사라지고 집중이 된다.",tip:"가벼운 탈수만으로도 피로와 두통이 생길 수 있어요."},
+ {l:"커피를 한 잔 더 마신다",fx:{h:-3,e:0,m:-1},r:"심장이 두근거린다.",tip:"커피는 하루 2~3잔 이내가 적당합니다."}]},
+],
+"저녁":[
+{e:"🌆",t:"퇴근 후",d:"집에 도착했다. 피곤하지만 저녁을 먹어야 한다.",c:[
+ {l:"두부구이, 채소볶음, 잡곡밥을 차린다",fx:{h:7,e:3,m:4},r:"차분히 먹고 나니 마음까지 안정된다.",tip:"저녁은 가볍고 소화 쉬운 식단이 수면에 유리해요."},
+ {l:"야식으로 라면에 치킨",fx:{h:-8,e:-3,m:2},r:"먹는 동안은 행복하지만 속이 더부룩하다.",tip:"늦은 시간의 기름진 식사는 역류와 수면 방해를 일으킵니다."},
+ {l:"배달 샐러드와 닭가슴살",fx:{h:5,e:2,m:1},r:"간편하게 단백질을 채웠다.",tip:"배달도 메뉴를 고르면 건강식이 될 수 있어요."}]},
+{e:"🏋️",t:"운동할까?",d:"헬스장 회원권이 있지만 한 달째 가지 않았다. 오늘은?",c:[
+ {l:"집 근처 공원 30분 빠르게 걷기",fx:{h:6,e:-1,m:5},r:"땀이 나니 개운하다. 작은 성공!",tip:"처음엔 부담 없는 운동으로 습관을 만드는 게 좋아요."},
+ {l:"무리해서 1시간 고강도 운동",fx:{h:-1,e:-6,m:2},r:"욕심이 과했다. 다리가 후들거린다.",tip:"갑작스러운 과한 운동은 부상과 피로 위험을 높입니다."},
+ {l:"내일부터 하자",fx:{h:-3,e:0,m:-3},r:"소파에서 멍하니 시간만 보냈다.",tip:"'내일부터'는 습관의 가장 큰 적입니다."}]},
+{e:"📱",t:"잠들기 전",d:"밤 11시. 눈은 피곤한데 숏폼 영상이 계속 넘어간다.",c:[
+ {l:"폰을 충전기에 꽂고 멀리 두고 눕는다",fx:{h:6,e:5,m:4},r:"빠르게 잠이 든다.",tip:"취침 전 화면의 블루라이트는 멜라토닌 분비를 방해합니다."},
+ {l:"딱 10분만... (새벽 2시)",fx:{h:-6,e:-6,m:-3},r:"어느새 새벽. 내일이 벌써 두렵다.",tip:"수면 부족은 식욕 호르몬을 교란시켜 폭식을 부릅니다."}]},
+{e:"🍷",t:"친구의 술 약속",d:"오랜만에 친구가 한잔하자고 연락했다.",c:[
+ {l:"무알코올 음료로 대화를 즐긴다",fx:{h:4,e:1,m:5},r:"웃고 떠들었더니 스트레스가 풀렸다.",tip:"모임의 즐거움은 지키되 알코올은 줄일 수 있어요."},
+ {l:"소주 3병, 2차까지 달린다",fx:{h:-10,e:-6,m:2},r:"다음 날 숙취가 고통스럽다.",tip:"과음은 간 건강과 수면을 모두 해칩니다."},
+ {l:"피곤하다고 거절한다",fx:{h:1,e:2,m:-2},r:"몸은 쉬었지만 조금 외롭다.",tip:"사회적 관계도 건강의 중요한 일부예요."}]},
+{e:"🛁",t:"밤의 루틴",d:"하루가 끝나간다. 샤워 후 시간이 조금 남았다.",c:[
+ {l:"따뜻한 차를 마시고 10분 일기를 쓴다",fx:{h:4,e:3,m:6},r:"마음이 차분히 정리된다.",tip:"감정 기록은 스트레스 해소에 효과적입니다."},
+ {l:"뉴스와 SNS를 밤새 본다",fx:{h:-3,e:-3,m:-5},r:"불안한 소식에 마음이 더 어수선해졌다.",tip:"밤의 자극적인 콘텐츠는 불안과 불면을 키워요."}]},
+]};
+
+const ENDINGS=[
+ {min:85,e:"🌟",t:"완벽한 회복",d:"7일 전의 지친 몸은 이제 없다. 가볍고 활기찬 몸과 맑은 정신으로 새 일상을 시작한다. 작은 습관의 힘이 삶을 바꿨다."},
+ {min:65,e:"😊",t:"눈에 띄는 호전",d:"몸이 한결 가벼워졌고 식습관도 자리 잡아간다. 이 흐름만 이어가면 건강을 완전히 되찾을 수 있다."},
+ {min:40,e:"😐",t:"반쯤의 변화",d:"좋은 선택도, 아쉬운 선택도 있었다. 건강은 한 번의 큰 결심이 아니라 매일의 반복이다. 다시 도전해보자."},
+ {min:0,e:"😵",t:"아직은 갈 길이 멀다",d:"오래된 습관은 쉽게 바뀌지 않는다. 하지만 지금 알게 된 것들이 다음 번 선택을 바꿔줄 것이다."}
+];
+
+let S;
+function shuffle(a){a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a}
+function newGame(){
+  S={day:1,slot:0,h:35,e:50,m:50,good:0,total:0,log:[],bag:{}};
+  for(const k of SLOTS)S.bag[k]=[];
+  next();
+}
+function pick(slot){
+  if(!S.bag[slot].length)S.bag[slot]=shuffle(POOL[slot].map((_,i)=>i));
+  return POOL[slot][S.bag[slot].pop()];
+}
+let cur;
+function next(){cur=pick(SLOTS[S.slot]);renderScene()}
+
+function statsHTML(){
+  const row=(n,v,c)=>`<div class="stat">${n} <b>${v}</b><div class="bar"><i style="width:${v}%;background:${c}"></i></div></div>`;
+  return `<div class="card"><div class="top"><span>📅 ${S.day}일차 / ${DAYS}일 · ${SLOTS[S.slot]}</span><span>🥇 좋은 선택 ${S.good}/${S.total}</span></div>
+  <div class="stats">${row("❤️ 건강",S.h,"var(--green)")}${row("⚡ 에너지",S.e,"var(--amber)")}${row("🧘 멘탈",S.m,"var(--blue)")}</div></div>`;
+}
+function renderScene(){
+  $("#app").innerHTML=statsHTML()+`<div class="card scene"><div class="emoji">${cur.e}</div><h2>${cur.t}</h2><p>${cur.d}</p>
+  ${cur.c.map((c,i)=>`<button class="choice" onclick="choose(${i})">${c.l}</button>`).join("")}</div>`;
+}
+function chip(n,v){if(!v)return"";return `<span class="chip ${v>0?"up":"down"}">${n} ${v>0?"+":""}${v}</span>`}
+function choose(i){
+  const c=cur.c[i],f=c.fx;
+  S.h=clamp(S.h+f.h);S.e=clamp(S.e+f.e);S.m=clamp(S.m+f.m);
+  S.total++;if(f.h>=3)S.good++;
+  const best=Math.max(...cur.c.map(x=>x.fx.h));
+  const bestTxt=f.h<best?`<div class="sub" style="margin-top:8px">💡 더 좋은 선택: "${cur.c.find(x=>x.fx.h===best).l}"</div>`:"";
+  $("#app").innerHTML=statsHTML()+`<div class="card scene"><div class="emoji">${cur.e}</div><h2>${c.l}</h2><p>${c.r}</p>
+  <div class="delta">${chip("건강",f.h)}${chip("에너지",f.e)}${chip("멘탈",f.m)}</div>
+  <div class="tip">📌 ${c.tip}</div>${bestTxt}
+  <button class="choice primary" onclick="advance()">계속하기</button></div>`;
+}
+function advance(){
+  if(S.h<=0||S.e<=0&&S.m<=0)return end(true);
+  S.slot++;
+  if(S.slot>=SLOTS.length){
+    S.slot=0;
+    if(S.day>=DAYS)return end(false);
+    return daySummary();
+  }
+  next();
+}
+function daySummary(){
+  S.day++;
+  const msg=S.h>=70?"몸이 확실히 달라지고 있어요. 이 기세로 가봅시다!":S.h>=40?"조금씩 나아지고 있어요. 더 신경 써볼까요?":"아직 몸이 무겁네요. 오늘은 더 건강한 선택을 해봐요.";
+  $("#app").innerHTML=statsHTML()+`<div class="card scene"><div class="emoji">🌙</div><h2>${S.day-1}일차 마무리</h2><p>${msg}</p>
+  <button class="choice primary" onclick="next()">${S.day}일차 시작</button></div>`;
+}
+function end(fail){
+  let E;
+  if(fail)E={e:"🚑",t:"쓰러지다",d:"무리한 생활을 이어가다 몸이 한계에 달했다. 병원에서 눈을 뜨며 깨닫는다. 건강은 잃기 전에 지켜야 한다는 것을."};
+  else E=ENDINGS.find(x=>S.h>=x.min);
+  $("#app").innerHTML=`<div class="card scene" style="text-align:center"><div class="emoji">${E.e}</div><h1>${E.t}</h1><p>${E.d}</p>
+  <div class="delta" style="justify-content:center">${chip("최종 건강",S.h)}<span class="chip">좋은 선택 ${S.good}/${S.total}</span></div>
+  <button class="choice primary" onclick="newGame()">다시 도전하기</button></div>`;
+}
+function title(){
+  $("#app").innerHTML=`<div class="card scene"><div class="emoji">🩺</div><h1>7일의 회복</h1>
+  <p>지훈(38)은 만성 피로와 잦은 야근, 불규칙한 식사로 건강이 무너졌다. 의사는 말했다. <b>"생활 습관을 바꾸지 않으면 다음은 없습니다."</b></p>
+  <p class="sub" style="margin-top:10px">7일 동안 매 순간의 선택으로 건강을 되찾아보자. 식사, 운동, 수면, 스트레스, 인간관계가 모두 영향을 준다.</p>
+  <button class="choice primary" onclick="newGame()">게임 시작</button></div>`;
+}
+title();
+</script>
+</body>
+</html>
